@@ -40,10 +40,12 @@ jobs:
 
       - name: Detect secrets
         run: |
-          detect-secrets scan --exclude-files '\.venv/.*' --list > /tmp/detected.txt
-          if [ -s /tmp/detected.txt ]; then
+          detect-secrets scan --exclude-files '\.venv/.*' > /tmp/scan.json
+          if python3 -c "import json; r=json.load(open('/tmp/scan.json')); exit(1 if r.get('results') else 0)"; then
+            echo "No secrets detected"
+          else
             echo "Potential secrets found:"
-            cat /tmp/detected.txt
+            python3 -c "import json; r=json.load(open('/tmp/scan.json')); [print(f'  {f}: {[s[\"type\"] for s in ss]}') for f,ss in r['results'].items()]"
             exit 1
           fi
 
