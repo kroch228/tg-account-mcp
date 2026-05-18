@@ -39,7 +39,13 @@ jobs:
         run: pytest -q
 
       - name: Detect secrets
-        run: detect-secrets scan --baseline .secrets.baseline --exclude-files '\.venv/.*'
+        run: |
+          detect-secrets scan --exclude-files '\.venv/.*' --list > /tmp/detected.txt
+          if [ -s /tmp/detected.txt ]; then
+            echo "Potential secrets found:"
+            cat /tmp/detected.txt
+            exit 1
+          fi
 
       - name: Pip audit
         run: pip-audit --strict --desc on
