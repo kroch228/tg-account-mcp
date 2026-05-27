@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tg-account-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "MCP server wrapping Telethon for personal Telegram account access"
 requires-python = ">=3.11"
 dependencies = [

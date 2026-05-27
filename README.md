@@ -1,74 +1,55 @@
 # tg-account-mcp
 
-> MCP server giving Claude Code safe, auditable control over your personal Telegram account via Telethon (MTProto).
+An MCP server that wraps [Telethon](https://github.com/LonamiWebs/Telethon) so Claude Code (or any MCP client) can drive your **personal Telegram account** over MTProto — chats, media, bots, reactions, groups, the lot.
 
-[![CI](https://github.com/kroch228/tg-account-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/kroch228/tg-account-mcp/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/kroch228/tg-account-mcp/actions/workflows/codeql.yml/badge.svg)](https://github.com/kroch228/tg-account-mcp/actions/workflows/codeql.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://python.org)
-[![MCP](https://img.shields.io/badge/protocol-MCP-green.svg)](https://modelcontextprotocol.io)
+> ⚠️ This drives a *user account*, not a bot. Aggressive automation can get the account limited or banned by Telegram. Read the safety notes below before pointing it at anything noisy.
 
----
+[![CI](https://github.com/kroch228/tg-account-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/kroch228/tg-account-mcp/actions/workflows/ci.yml) · [MIT](LICENSE) · Python 3.11+
 
-<details open><summary>🇬🇧 English</summary>
+## Stack
 
-## What it is
+- **Server:** Python 3.11+, [`mcp`](https://pypi.org/project/mcp/) (low-level `Server` over `stdio`)
+- **Telegram:** [`telethon`](https://pypi.org/project/Telethon/) ≥ 1.36 (MTProto user session)
+- **Config / secrets:** `python-dotenv` + env vars only — никаких хардкоженых ключей
 
-A self-contained [MCP](https://modelcontextprotocol.io) server that wraps [Telethon](https://github.com/LonamiWebs/Telethon) to let Claude Code interact with your **personal Telegram account** over MTProto — reading chats, sending messages, searching history, and managing contacts.
+38 tools registered, grouped into 5 blocks (см. ниже).
 
-**⚠️ Security warning:** This drives a *real user account*, not a bot. Aggressive automation can get your account limited or banned by Telegram. Use responsibly.
-
-## Features
-
-- `tg_list_dialogs` — list chats, channels, and DMs with unread counts
-- `tg_read_history` — read message history from any dialog
-- `tg_send_message` — send a message (with optional reply and silent mode)
-- `tg_edit_message` — edit an existing message
-- `tg_delete_message` — delete messages (for everyone or self only)
-- `tg_search` — full-text search globally or within a dialog
-- `tg_mark_read` — mark messages as read
-- `tg_list_contacts` — list all contacts from the address book
-- `tg_resolve_username` — resolve @username to entity ID and type
-
-## Requirements
+## Prerequisites
 
 - Python 3.11+
-- Telegram `api_id` and `api_hash` from [my.telegram.org](https://my.telegram.org/apps)
-- A phone number linked to your Telegram account
+- `api_id` / `api_hash` from [my.telegram.org/apps](https://my.telegram.org/apps)
+- A phone number tied to a Telegram account
+- Optional: `TG_2FA_PASSWORD` if 2FA is on
 
 ## Install
 
 ```bash
-git clone https://github.com/<owner>/tg-account-mcp.git
+git clone https://github.com/kroch228/tg-account-mcp.git
 cd tg-account-mcp
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate          # fish: source .venv/bin/activate.fish
 pip install -e ".[dev]"
 cp .env.example .env
-# Fill in TG_API_ID, TG_API_HASH, TG_PHONE
+# Заполни TG_API_ID, TG_API_HASH, TG_PHONE (и TG_2FA_PASSWORD при 2FA)
 ```
 
 ## First-run auth
 
-**You must complete this step before connecting to Claude Code.** The MCP server will hang on first connection if the session is not authorized.
+The MCP server hangs on first connection if the session is not authorised — авторизуйся **до** того, как подключаешь к Claude Code.
 
 ```bash
 python -m tg_account_mcp.auth
 ```
 
-You will be prompted to enter the SMS code sent to your phone. If you have 2FA enabled, you'll also need to enter your password (or set `TG_2FA_PASSWORD` in `.env`).
-
-The session is saved to `.tg-session/user.session` (chmod 600, gitignored). You won't need to re-authenticate unless the session expires.
+Введёшь SMS-код (и пароль 2FA, если включён). Сессия ляжет в `.tg-session/user.session` (`chmod 600`, в `.gitignore`). Повторная авторизация не нужна, пока сессия не истекла.
 
 ## Register with Claude Code
-
-### CLI
 
 ```bash
 claude mcp add tg-account -- python -m tg_account_mcp.server
 ```
 
-### JSON config (`~/.config/claude/claude_desktop_config.json`)
+Или через JSON-конфиг (`~/.config/claude/claude_desktop_config.json`):
 
 ```json
 {
@@ -86,287 +67,154 @@ claude mcp add tg-account -- python -m tg_account_mcp.server
 }
 ```
 
-Restart Claude Code after adding — `tg_*` tools will appear.
+После добавления перезапусти Claude Code — `tg_*` инструменты появятся в списке.
 
-## Tool reference
+## Tools — overview
 
-| Tool | Params | Returns | Write? |
-|------|--------|---------|--------|
-| `tg_list_dialogs` | `limit?`, `archived?` | `[{id, title, kind, unread_count, last_message_at}]` | |
-| `tg_read_history` | `dialog_id`, `limit?`, `offset_id?` | `[{id, from, text, date, reply_to_id}]` | |
-| `tg_send_message` | `dialog_id`, `text`, `reply_to?`, `silent?` | `{id, date}` | ✏️ |
-| `tg_edit_message` | `dialog_id`, `message_id`, `text` | `{ok}` | ✏️ |
-| `tg_delete_message` | `dialog_id`, `message_ids`, `revoke?` | `{deleted}` | ✏️ |
-| `tg_search` | `query`, `dialog_id?`, `limit?` | `[{id, from, text, date, chat_id}]` | |
-| `tg_mark_read` | `dialog_id`, `max_message_id?` | `{ok}` | ✏️ |
-| `tg_list_contacts` | — | `[{id, first_name, last_name, username, phone}]` | |
-| `tg_resolve_username` | `username` | `{id, kind, title}` | |
+`dialog_id` принимает: numeric peer ID, `@username`, или `"me"` (Saved Messages). File paths — абсолютные или относительно cwd сервера. Везде, где ожидается медиа-файл, http(s) URL тоже работает.
 
-`dialog_id` accepts: numeric peer ID, `@username`, or `"me"` (Saved Messages).
+### Block A — Media (10)
+
+| Tool | Params | Returns |
+|-|-|-|
+| `tg_send_photo` | `dialog_id`, `file`, `caption?`, `reply_to?`, `silent?`, `parse_mode?` | `{id, date, chat_id}` |
+| `tg_send_document` | `dialog_id`, `file`, `caption?`, `parse_mode?` | `{id, …}` |
+| `tg_send_video` | `dialog_id`, `file`, `caption?`, `supports_streaming?`, `parse_mode?` | `{id, …}` |
+| `tg_send_voice` | `dialog_id`, `file` | `{id, …}` |
+| `tg_send_audio` | `dialog_id`, `file`, `caption?` | `{id, …}` |
+| `tg_send_animation` | `dialog_id`, `file`, `caption?` | `{id, …}` |
+| `tg_send_sticker` | `dialog_id`, `file` | `{id, …}` |
+| `tg_send_media_group` | `dialog_id`, `files[1..10]`, `caption?` | `{ids, count}` |
+| `tg_download_media` | `dialog_id`, `message_id`, `out_path?` | `{saved_path, media_kind, size}` |
+| `tg_get_media_info` | `dialog_id`, `message_id` | `{media_kind, mime_type, size, duration, width, height, …}` |
+
+### Block B — Bot interaction (4)
+
+| Tool | Params | Returns |
+|-|-|-|
+| `tg_send_to_bot` | `bot`, `text`, `parse_mode?` | `{id, …}` |
+| `tg_wait_bot_reply` | `bot`, `after_message_id?`, `timeout?`, `poll_interval?` | `message \| null` (с полем `keyboard`) |
+| `tg_get_bot_keyboard` | `dialog_id`, `message_id` | `{has_buttons, keyboard: [[button]]}` |
+| `tg_click_inline_button` | `dialog_id`, `message_id`, `text? \| data? \| row+col` | `{clicked, alert?, message?, url?}` |
+
+`tg_wait_bot_reply` polls `get_messages(min_id=…)` каждые ~700 ms — не event-based, но контекст-aware: можно передать `after_message_id`, чтобы исключить уже виденные.
+
+### Block C — Chats / messages (12)
+
+| Tool | Params | Returns |
+|-|-|-|
+| `tg_list_dialogs` | `limit?`, `archived?` | `[{id, title, kind, unread_count, last_message_at}]` |
+| `tg_read_history` | `dialog_id`, `limit?`, `offset_id?` | `[message]` |
+| `tg_get_chat_info` | `dialog_id` | `{id, kind, title, username, …}` |
+| `tg_send_message` | `dialog_id`, `text`, `reply_to?`, `silent?`, `parse_mode?`, `link_preview?` | `{id, date, chat_id}` |
+| `tg_edit_message` | `dialog_id`, `message_id`, `text`, `parse_mode?` | `{ok}` |
+| `tg_delete_message` | `dialog_id`, `message_ids`, `revoke?` | `{deleted}` |
+| `tg_forward_messages` | `from_dialog`, `to_dialog`, `message_ids`, `silent?`, `drop_author?` | `{ids, count}` |
+| `tg_search` | `query`, `dialog_id?`, `limit?` | `[message]` |
+| `tg_mark_read` | `dialog_id`, `max_message_id?` | `{ok}` |
+| `tg_pin_message` | `dialog_id`, `message_id`, `notify?`, `pm_oneside?` | `{ok, pinned_id}` |
+| `tg_unpin_message` | `dialog_id`, `message_id?` | `{ok, unpinned_id\|"all"}` |
+| `tg_get_pinned_messages` | `dialog_id`, `limit?` | `[message]` |
+
+`parse_mode` — `"md"` / `"markdown"` / `"html"`.
+
+### Block D — Reactions, users, groups, presence (12)
+
+| Tool | Params | Returns |
+|-|-|-|
+| `tg_set_reaction` | `dialog_id`, `message_id`, `emoji`, `big?` | `{ok, emoji}` |
+| `tg_get_message_reactions` | `dialog_id`, `message_ids` | `[{id, reactions:[{reaction, count}]}]` |
+| `tg_list_contacts` | — | `[{id, first_name, last_name, username, phone}]` |
+| `tg_resolve_username` | `username` | `{id, kind, title}` |
+| `tg_get_user_info` | `user` (id / @user / `"me"`) | `{id, name, username, bot, premium, …}` |
+| `tg_download_profile_photo` | `user`, `out_path?` | `{saved_path}` |
+| `tg_join_chat` | `chat` (`@name` / id / `t.me/+hash` / `+hash`) | `{ok, via, id?}` |
+| `tg_leave_chat` | `chat` | `{ok, id}` |
+| `tg_list_participants` | `chat`, `limit?`, `search?` | `[{id, first_name, username, bot, …}]` |
+| `tg_typing` | `dialog_id`, `action` (`typing\|upload_photo\|upload_document\|record_voice\|record_video\|cancel`) | `{ok, action}` |
+| `tg_set_online_status` | `online?` | `{ok, online}` |
+| `tg_get_me` | — | `{id, first_name, username, phone, premium}` |
+
+Передать `emoji=null` (или `""`) в `tg_set_reaction` — снять реакцию.
+
+## Examples
+
+Отправить картинку боту, дождаться ответа, нажать на inline-кнопку:
+
+```jsonc
+{ "name": "tg_send_photo",
+  "arguments": { "dialog_id": "@my_image_bot", "file": "/tmp/cat.jpg", "caption": "what is this?" } }
+
+{ "name": "tg_wait_bot_reply",
+  "arguments": { "bot": "@my_image_bot", "timeout": 30 } }
+// → { id: 12345, text: "Looks like a cat. Verify?", keyboard: [[{text:"Yes",data:"y"},{text:"No",data:"n"}]] }
+
+{ "name": "tg_click_inline_button",
+  "arguments": { "dialog_id": "@my_image_bot", "message_id": 12345, "text": "Yes" } }
+// → { clicked: true, alert: false, message: "Confirmed" }
+```
+
+Альбом, реакция, закреп:
+
+```jsonc
+{ "name": "tg_send_media_group",
+  "arguments": { "dialog_id": "me", "files": ["a.jpg","b.jpg","c.jpg"], "caption": "trip" } }
+
+{ "name": "tg_set_reaction",
+  "arguments": { "dialog_id": "me", "message_id": 999, "emoji": "🔥" } }
+
+{ "name": "tg_pin_message",
+  "arguments": { "dialog_id": "me", "message_id": 999 } }
+```
+
+Markdown / HTML formatting:
+
+```jsonc
+{ "name": "tg_send_message",
+  "arguments": { "dialog_id": "me", "text": "**bold** _italic_ `code`", "parse_mode": "md" } }
+
+{ "name": "tg_send_message",
+  "arguments": { "dialog_id": "me", "text": "<b>bold</b> <i>italic</i>", "parse_mode": "html" } }
+```
 
 ## Security model
 
-- **Secrets via environment only** — `TG_API_ID`, `TG_API_HASH`, `TG_PHONE`, `TG_2FA_PASSWORD` are never hardcoded or returned in tool responses.
-- **Session file** — stored at `.tg-session/user.session` with `chmod 600`, listed in `.gitignore`.
-- **No leakage** — no tool ever returns `api_hash`, session bytes, 2FA password, or unmasked phone numbers.
-- **Write logging** — `tg_send_message` and `tg_delete_message` log to stderr only (peer masked, text truncated).
-- **Rate limiting** — minimum 1s between sends to the same peer.
-- **FloodWait** — handled with sleep + single retry; never busy-loops.
-- See [SECURITY.md](SECURITY.md) for vulnerability reporting.
+- **Secrets via env only** — `TG_API_ID`, `TG_API_HASH`, `TG_PHONE`, `TG_2FA_PASSWORD`. Никогда не возвращаются в ответах tool'ов и не логируются в plain text.
+- **Session file** — `.tg-session/user.session`, `chmod 600`, `.gitignore`. Никакие байты сессии наружу не уходят.
+- **Write logging** — `tg_send_message` / `tg_delete_message` / `tg_send_photo` (и т.д.) пишут одну строку в **stderr** с замаскированным peer и обрезанным текстом / именем файла. Stdout всегда чистый JSON-RPC.
+- **Rate limiting** — минимум 1 секунда между отправками в один peer (per-peer cooldown).
+- **FloodWait** — обрабатывается через `asyncio.sleep(e.seconds)` + одна повторная попытка. Если Telegram говорит ждать > 60 c — пробрасывается наверх, без busy-loop.
+- **Path resolution** — относительные пути к файлам резолвятся от `cwd` сервера; абсолютные пути проверяются на существование до отправки.
+- См. [SECURITY.md](SECURITY.md) для сообщения об уязвимостях.
 
 ## Development
 
 ```bash
 pre-commit install
-ruff check .
-ruff format .
+ruff check src tests
+ruff format src tests
 pytest -q
 ```
+
+Тестовый файл `tests/test_registry.py` — smoke-проверка реестра (все 38 tools зарегистрированы, у каждого валидная schema + handler, нет дубликатов имён) + изолированные unit-тесты на валидацию входа (`tg_send_photo` с несуществующим путём, `tg_send_media_group` с пустым списком и > 10, `tg_click_inline_button` без селектора, `tg_send_to_bot` с `me`, `tg_typing` с неизвестным action).
+
+```
+src/tg_account_mcp/
+├── __main__.py        # python -m tg_account_mcp.server
+├── auth.py            # one-shot interactive login (writes .tg-session/user.session)
+├── client.py          # TelegramClient factory + entity cache + resolve_peer()
+├── server.py          # MCP Server: registry-driven dispatcher
+└── tools.py           # 38 tool handlers + helpers (_message_to_dict, _media_kind, ...)
+tests/
+├── test_tools.py      # mocked Telethon, behaviour of legacy tools
+└── test_registry.py   # registry shape + input validation smoke
+```
+
+## Changelog
+
+- **0.2.0** — расширение до 38 tools (медиа, боты с inline-кнопками, реакции, pin/forward, presence). Реестр-driven dispatcher вместо `match/case`. README переписан, добавлен `tests/test_registry.py`.
+- **0.1.0** — первоначальный публичный релиз: 9 tools (диалоги, send/edit/delete, search, contacts).
 
 ## License
 
 [MIT](LICENSE)
-
-</details>
-
----
-
-<details><summary>🇷🇺 Русский</summary>
-
-## Что это
-
-Автономный [MCP](https://modelcontextprotocol.io)-сервер на базе [Telethon](https://github.com/LonamiWebs/Telethon), который позволяет Claude Code взаимодействовать с вашим **личным аккаунтом Telegram** по протоколу MTProto — читать чаты, отправлять сообщения, искать по истории и управлять контактами.
-
-**⚠️ Внимание:** Это управление *реальным пользовательским аккаунтом*, а не ботом. Агрессивная автоматизация может привести к ограничению или бану аккаунта со стороны Telegram. Используйте ответственно.
-
-## Возможности
-
-- `tg_list_dialogs` — список чатов, каналов и ЛС с количеством непрочитанных
-- `tg_read_history` — чтение истории сообщений из любого диалога
-- `tg_send_message` — отправка сообщения (с ответом и тихим режимом)
-- `tg_edit_message` — редактирование существующего сообщения
-- `tg_delete_message` — удаление сообщений (для всех или только для себя)
-- `tg_search` — полнотекстовый поиск глобально или в конкретном диалоге
-- `tg_mark_read` — пометить сообщения как прочитанные
-- `tg_list_contacts` — список всех контактов из адресной книги
-- `tg_resolve_username` — резолв @username в ID и тип сущности
-
-## Требования
-
-- Python 3.11+
-- `api_id` и `api_hash` с [my.telegram.org](https://my.telegram.org/apps)
-- Номер телефона, привязанный к аккаунту Telegram
-
-## Установка
-
-```bash
-git clone https://github.com/<owner>/tg-account-mcp.git
-cd tg-account-mcp
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-cp .env.example .env
-# Заполните TG_API_ID, TG_API_HASH, TG_PHONE
-```
-
-## Первый запуск (авторизация)
-
-**Этот шаг обязателен до подключения к Claude Code.** MCP-сервер зависнет при первом подключении, если сессия не авторизована.
-
-```bash
-python -m tg_account_mcp.auth
-```
-
-Вам будет предложено ввести SMS-код. Если включена двухфакторная аутентификация — также пароль (или задайте `TG_2FA_PASSWORD` в `.env`).
-
-Сессия сохраняется в `.tg-session/user.session` (chmod 600, в `.gitignore`). Повторная авторизация не потребуется до истечения сессии.
-
-## Подключение к Claude Code
-
-### CLI
-
-```bash
-claude mcp add tg-account -- python -m tg_account_mcp.server
-```
-
-### JSON-конфиг (`~/.config/claude/claude_desktop_config.json`)
-
-```json
-{
-  "mcpServers": {
-    "tg-account": {
-      "command": "python",
-      "args": ["-m", "tg_account_mcp.server"],
-      "env": {
-        "TG_API_ID": "12345678",
-        "TG_API_HASH": "your_api_hash_here",
-        "TG_PHONE": "+79001234567"
-      }
-    }
-  }
-}
-```
-
-После добавления перезапустите Claude Code — инструменты `tg_*` появятся в списке.
-
-## Справочник инструментов
-
-| Инструмент | Параметры | Возвращает | Запись? |
-|------------|-----------|------------|---------|
-| `tg_list_dialogs` | `limit?`, `archived?` | `[{id, title, kind, unread_count, last_message_at}]` | |
-| `tg_read_history` | `dialog_id`, `limit?`, `offset_id?` | `[{id, from, text, date, reply_to_id}]` | |
-| `tg_send_message` | `dialog_id`, `text`, `reply_to?`, `silent?` | `{id, date}` | ✏️ |
-| `tg_edit_message` | `dialog_id`, `message_id`, `text` | `{ok}` | ✏️ |
-| `tg_delete_message` | `dialog_id`, `message_ids`, `revoke?` | `{deleted}` | ✏️ |
-| `tg_search` | `query`, `dialog_id?`, `limit?` | `[{id, from, text, date, chat_id}]` | |
-| `tg_mark_read` | `dialog_id`, `max_message_id?` | `{ok}` | ✏️ |
-| `tg_list_contacts` | — | `[{id, first_name, last_name, username, phone}]` | |
-| `tg_resolve_username` | `username` | `{id, kind, title}` | |
-
-`dialog_id` принимает: числовой ID, `@username` или `"me"` (Избранное).
-
-## Модель безопасности
-
-- **Секреты только через переменные окружения** — `TG_API_ID`, `TG_API_HASH`, `TG_PHONE`, `TG_2FA_PASSWORD` никогда не хардкодятся и не возвращаются в ответах.
-- **Файл сессии** — хранится в `.tg-session/user.session` с правами `chmod 600`, в `.gitignore`.
-- **Без утечек** — ни один инструмент не возвращает `api_hash`, байты сессии, пароль 2FA или немаскированные номера телефонов.
-- **Логирование записи** — `tg_send_message` и `tg_delete_message` пишут только в stderr (peer замаскирован, текст обрезан).
-- **Rate limiting** — минимум 1 секунда между отправками в один диалог.
-- **FloodWait** — обрабатывается через sleep + одна повторная попытка; без busy-loop.
-- См. [SECURITY.md](SECURITY.md) для сообщения об уязвимостях.
-
-## Разработка
-
-```bash
-pre-commit install
-ruff check .
-ruff format .
-pytest -q
-```
-
-## Лицензия
-
-[MIT](LICENSE)
-
-</details>
-
----
-
-<details><summary>🇨🇳 中文</summary>
-
-## 简介
-
-一个基于 [Telethon](https://github.com/LonamiWebs/Telethon) 的独立 [MCP](https://modelcontextprotocol.io) 服务器，让 Claude Code 通过 MTProto 协议与你的**个人 Telegram 账号**交互——读取聊天、发送消息、搜索历史记录和管理联系人。
-
-**⚠️ 安全警告：** 这是对*真实用户账号*的操控，而非机器人。过度自动化可能导致 Telegram 限制或封禁你的账号。请负责任地使用。
-
-## 功能
-
-- `tg_list_dialogs` — 列出聊天、频道和私信，含未读数
-- `tg_read_history` — 读取任意对话的消息历史
-- `tg_send_message` — 发送消息（支持回复和静默模式）
-- `tg_edit_message` — 编辑已发送的消息
-- `tg_delete_message` — 删除消息（双向或仅自己）
-- `tg_search` — 全局或指定对话内全文搜索
-- `tg_mark_read` — 标记消息为已读
-- `tg_list_contacts` — 列出通讯录中的所有联系人
-- `tg_resolve_username` — 将 @用户名 解析为实体 ID 和类型
-
-## 环境要求
-
-- Python 3.11+
-- 从 [my.telegram.org](https://my.telegram.org/apps) 获取的 `api_id` 和 `api_hash`
-- 绑定 Telegram 账号的手机号码
-
-## 安装
-
-```bash
-git clone https://github.com/<owner>/tg-account-mcp.git
-cd tg-account-mcp
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-cp .env.example .env
-# 填写 TG_API_ID、TG_API_HASH、TG_PHONE
-```
-
-## 首次运行（授权）
-
-**必须在连接 Claude Code 之前完成此步骤。** 如果会话未授权，MCP 服务器在首次连接时会挂起。
-
-```bash
-python -m tg_account_mcp.auth
-```
-
-系统会提示你输入收到的短信验证码。如果启用了两步验证，还需要输入密码（或在 `.env` 中设置 `TG_2FA_PASSWORD`）。
-
-会话文件保存在 `.tg-session/user.session`（权限 chmod 600，已加入 `.gitignore`）。除非会话过期，否则无需重新授权。
-
-## 注册到 Claude Code
-
-### 命令行方式
-
-```bash
-claude mcp add tg-account -- python -m tg_account_mcp.server
-```
-
-### JSON 配置（`~/.config/claude/claude_desktop_config.json`）
-
-```json
-{
-  "mcpServers": {
-    "tg-account": {
-      "command": "python",
-      "args": ["-m", "tg_account_mcp.server"],
-      "env": {
-        "TG_API_ID": "12345678",
-        "TG_API_HASH": "your_api_hash_here",
-        "TG_PHONE": "+79001234567"
-      }
-    }
-  }
-}
-```
-
-添加后重启 Claude Code，`tg_*` 工具将出现在可用列表中。
-
-## 工具参考
-
-| 工具 | 参数 | 返回值 | 写操作? |
-|------|------|--------|---------|
-| `tg_list_dialogs` | `limit?`, `archived?` | `[{id, title, kind, unread_count, last_message_at}]` | |
-| `tg_read_history` | `dialog_id`, `limit?`, `offset_id?` | `[{id, from, text, date, reply_to_id}]` | |
-| `tg_send_message` | `dialog_id`, `text`, `reply_to?`, `silent?` | `{id, date}` | ✏️ |
-| `tg_edit_message` | `dialog_id`, `message_id`, `text` | `{ok}` | ✏️ |
-| `tg_delete_message` | `dialog_id`, `message_ids`, `revoke?` | `{deleted}` | ✏️ |
-| `tg_search` | `query`, `dialog_id?`, `limit?` | `[{id, from, text, date, chat_id}]` | |
-| `tg_mark_read` | `dialog_id`, `max_message_id?` | `{ok}` | ✏️ |
-| `tg_list_contacts` | — | `[{id, first_name, last_name, username, phone}]` | |
-| `tg_resolve_username` | `username` | `{id, kind, title}` | |
-
-`dialog_id` 接受：数字 peer ID、`@username` 或 `"me"`（收藏夹/已保存消息）。
-
-## 安全模型
-
-- **仅通过环境变量传递密钥** — `TG_API_ID`、`TG_API_HASH`、`TG_PHONE`、`TG_2FA_PASSWORD` 永远不会硬编码或在工具响应中返回。
-- **会话文件** — 存储在 `.tg-session/user.session`，权限 `chmod 600`，已加入 `.gitignore`。
-- **无泄露** — 任何工具都不会返回 `api_hash`、会话字节、两步验证密码或未脱敏的手机号。
-- **写操作日志** — `tg_send_message` 和 `tg_delete_message` 仅输出到 stderr（对端已脱敏，文本已截断）。
-- **速率限制** — 向同一对端发送消息的最小间隔为 1 秒。
-- **FloodWait** — 通过 sleep + 单次重试处理；绝不会忙等待。
-- 漏洞报告请参阅 [SECURITY.md](SECURITY.md)。
-
-## 开发
-
-```bash
-pre-commit install
-ruff check .
-ruff format .
-pytest -q
-```
-
-## 许可证
-
-[MIT](LICENSE)
-
-</details>
