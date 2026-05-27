@@ -1,5 +1,7 @@
 # tg-account-mcp
 
+<p align="center"><img src="docs/hero.svg" alt="tg-account-mcp — MCP · Telethon · 38 tools" width="100%"></p>
+
 An MCP server that wraps [Telethon](https://github.com/LonamiWebs/Telethon) so Claude Code (or any MCP client) can drive your **personal Telegram account** over MTProto — chats, media, bots, reactions, groups, the lot.
 
 > ⚠️ This drives a *user account*, not a bot. Aggressive automation can get the account limited or banned by Telegram. Read the safety notes below before pointing it at anything noisy.
